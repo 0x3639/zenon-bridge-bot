@@ -50,6 +50,8 @@ jobs:
         bandit -r src/ -f json -o bandit-report.json || true
     
     - name: Test imports
+      env:
+        TELEGRAM_BOT_TOKEN: "dummy_token_for_testing"
       run: |
         python -c "from src.config import BRIDGE_ADDRESS"
         python -c "from src.zenon.decoder import TransactionDecoder"

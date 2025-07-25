@@ -35,6 +35,10 @@ class ZenonBridgeBot:
     
     async def initialize(self):
         """Initialize bot components."""
+        # Check for bot token
+        if not TELEGRAM_BOT_TOKEN:
+            raise ValueError("TELEGRAM_BOT_TOKEN not found in environment variables")
+        
         # Initialize database
         await init_database()
         

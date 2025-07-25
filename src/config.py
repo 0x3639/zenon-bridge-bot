@@ -5,8 +5,6 @@ load_dotenv()
 
 # Telegram Bot Configuration
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-if not TELEGRAM_BOT_TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN not found in environment variables")
 
 # Zenon Network Configuration
 ZENON_WSS_URL = 'wss://my.hc1node.com:35998'
