@@ -194,8 +194,11 @@ docker run -d \
 ### Docker Compose Method (Recommended)
 
 ```bash
-# Create .env file with your token
-echo "TELEGRAM_BOT_TOKEN=your_token_here" > .env
+# Copy the example environment file
+cp .env.example .env
+
+# Edit .env and add your bot token
+nano .env  # or use your preferred editor
 
 # Build and run with docker-compose
 docker-compose up -d
