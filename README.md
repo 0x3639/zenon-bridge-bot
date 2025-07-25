@@ -1,5 +1,10 @@
 # Zenon Bridge Alert Bot
 
+[![CI](https://github.com/0x3639/zenon-bridge-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/0x3639/zenon-bridge-bot/actions/workflows/ci.yml)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Docker](https://img.shields.io/badge/Docker-supported-blue.svg)](https://www.docker.com/)
+
 A Telegram bot that monitors all activity on the Zenon Bridge in real-time and sends notifications for bridge transactions.
 
 ## Features
