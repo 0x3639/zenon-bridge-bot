@@ -1,5 +1,9 @@
+import json
+import random
+import os
 from typing import Dict, List
 from datetime import datetime
+from pathlib import Path
 from src.config import ETHERSCAN_BASE_URL, ZENONHUB_BASE_URL, TRANSACTION_TYPES
 
 class MessageFormatter:
@@ -19,6 +23,41 @@ class MessageFormatter:
             'zts1znnxxxxxxxxxxxxx9z4ulx': 'ZNN',
             'zts1qsrxxxxxxxxxxxxxmrhjll': 'QSR'
         }
+        
+        # Load custom messages
+        self.wrap_messages = self._load_messages('wrap_messages.json')
+        self.unwrap_messages = self._load_messages('unwrap_messages.json')
+    
+    def _load_messages(self, filename: str) -> List[Dict]:
+        """Load custom messages from JSON file."""
+        try:
+            # Get path relative to project root
+            project_root = Path(__file__).parent.parent.parent
+            messages_path = project_root / 'messages' / filename
+            
+            if messages_path.exists():
+                with open(messages_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            else:
+                print(f"Warning: Messages file {filename} not found")
+                return []
+        except Exception as e:
+            print(f"Error loading messages from {filename}: {e}")
+            return []
+    
+    def _get_custom_message(self, tx_type: str) -> str:
+        """Get a random custom message for the transaction type."""
+        try:
+            if tx_type == TRANSACTION_TYPES['WRAP_TOKEN'] and self.wrap_messages:
+                message_data = random.choice(self.wrap_messages)
+                return f"\n💭 *{message_data['message']}*\n   — {message_data['author']}\n"
+            elif tx_type == TRANSACTION_TYPES['UNWRAP_TOKEN'] and self.unwrap_messages:
+                message_data = random.choice(self.unwrap_messages)
+                return f"\n💭 *{message_data['message']}*\n   — {message_data['author']}\n"
+        except Exception as e:
+            print(f"Error getting custom message: {e}")
+        
+        return ""
     
     def format_transaction(self, tx: Dict) -> str:
         """Format a transaction into a Telegram message."""
@@ -59,6 +98,11 @@ class MessageFormatter:
         # Add timestamp if available
         if tx.get('timestamp'):
             lines.append(f"🕐 Time: {tx['timestamp'].strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        
+        # Add custom message for wrap/unwrap transactions
+        custom_message = self._get_custom_message(tx_type)
+        if custom_message:
+            lines.append(custom_message)
         
         return "\n".join(lines)
     

@@ -11,6 +11,7 @@ A Telegram bot that monitors all activity on the Zenon Bridge in real-time and s
 
 - 🔄 Real-time monitoring of bridge transactions
 - 📱 Telegram notifications for all bridge activity
+- 💭 Random custom messages for wrap/unwrap transactions
 - 📊 Transaction statistics (24h, 7d, 30d)
 - 🔧 Customizable notification filters
 - 🔗 Direct links to ZenonHub and Etherscan
@@ -110,6 +111,50 @@ python src/bot.py
    /filter all
    ```
 
+## Custom Messages
+
+The bot includes fun, randomly selected custom messages for wrap and unwrap transactions to make notifications more engaging! Each message includes an author attribution and a unique perspective on the bridging experience.
+
+### Message Examples
+
+**Wrap Transaction Messages:**
+- "Another brave soul ventures into the multiverse! 🌌" — 0x3639
+- "Bridging the gap between worlds, one transaction at a time! 🌉" — ZenonCommunity
+
+**Unwrap Transaction Messages:**
+- "Welcome back to the Network of Momentum! 🏠" — 0x3639
+- "Your tokens are coming home to Zenon! 🌟" — ZenonCommunity
+
+### Adding Your Own Messages
+
+Want to contribute fun messages to the bot? We welcome community contributions!
+
+**How to submit new messages:**
+
+1. **Fork the repository** on GitHub
+2. **Edit the message files:**
+   - For wrap messages: `messages/wrap_messages.json`
+   - For unwrap messages: `messages/unwrap_messages.json`
+3. **Add your message** following this format:
+   ```json
+   {
+     "author": "YourUsername",
+     "message": "Your creative message here! 🚀"
+   }
+   ```
+4. **Submit a Pull Request** with:
+   - **Title:** "Add custom messages for [wrap/unwrap] transactions"
+   - **Description:** Brief explanation of your messages
+   - **Guidelines:** Keep messages fun, positive, and bridge-related!
+
+**Message Guidelines:**
+- ✅ Keep it fun and positive
+- ✅ Bridge/interchain/multiverse themes preferred
+- ✅ Include relevant emojis
+- ✅ Keep under 100 characters for readability
+- ❌ No inappropriate or offensive content
+- ❌ No promotional/spam content
+
 ## Configuration
 
 ### Environment Variables
@@ -159,6 +204,9 @@ zenon-bridge-alert/
 │   │   └── formatter.py       # Message formatting
 │   └── models/
 │       └── transactions.py    # Transaction models
+├── messages/                  # Custom messages for transactions
+│   ├── wrap_messages.json     # Messages for wrap transactions
+│   └── unwrap_messages.json   # Messages for unwrap transactions
 ├── database.py                # Database setup
 ├── requirements.txt           # Python dependencies
 ├── .env.example              # Environment template
