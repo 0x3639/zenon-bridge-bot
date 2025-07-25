@@ -77,9 +77,9 @@ class MessageFormatter:
         
         # Add addresses
         if tx.get('from_addr'):
-            lines.append(f"📤 From: `{self._short_address(tx['from_addr'])}`")
+            lines.append(f"📤 From: {self._format_zts_address(tx['from_addr'])}")
         if tx.get('to_addr'):
-            lines.append(f"📥 To: `{self._short_address(tx['to_addr'])}`")
+            lines.append(f"📥 To: {self._format_zts_address(tx['to_addr'])}")
         
         # Add ETH address if present
         if tx.get('eth_addr'):
@@ -177,19 +177,26 @@ Monitor all activity on the Zenon Bridge in real-time!
         """Format status message."""
         status = "✅ Connected" if is_connected else "❌ Disconnected"
         
+        bridge_address = 'z1qxemdeddedxdrydgexxxxxxxxxxxxxxxmqgr0d'
+        
         return f"""
 🔌 **Bot Status**
 
 WebSocket: {status}
 Active Subscribers: {subscriber_count}
-Bridge Address: `{self._short_address('z1qxemdeddedxdrydgexxxxxxxxxxxxxxxmqgr0d')}`
+Bridge Address: {self._format_zts_address(bridge_address)}
 """
     
     def _short_address(self, address: str) -> str:
-        """Shorten address for display."""
+        """Shorten address for display with new format."""
         if len(address) > 16:
-            return f"{address[:8]}...{address[-6:]}"
+            return f"{address[:10]}...{address[-8:]}"
         return address
+    
+    def _format_zts_address(self, address: str, context: str = "") -> str:
+        """Format ZTS address as clickable link to ZenonHub."""
+        short_addr = self._short_address(address)
+        return f"[{short_addr}]({ZENONHUB_BASE_URL}/explorer/account/{address})"
     
     def _short_hash(self, hash: str) -> str:
         """Shorten transaction hash for display."""
