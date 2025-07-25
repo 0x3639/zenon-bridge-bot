@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  zenon-bridge-bot:
+    build: .
+    container_name: zenon-bridge-bot
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
