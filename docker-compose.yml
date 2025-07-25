@@ -3,13 +3,15 @@ version: '3.8'
 services:
   zenon-bridge-bot:
     build: .
+    image: zenon-bridge-bot:latest
     container_name: zenon-bridge-bot
     restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DATABASE_PATH=/app/data/bridge_bot.db
     volumes:
       - ./data:/app/data
-      - ./.env:/app/.env:ro
-    environment:
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     logging:
       driver: "json-file"
       options:

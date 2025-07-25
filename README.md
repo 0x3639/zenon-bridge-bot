@@ -173,18 +173,68 @@ The bot connects to the Zenon public node at:
 
 ## Docker Support (Optional)
 
-Build and run with Docker:
+### Docker Run Method
 
 ```bash
 # Build image
 docker build -t zenon-bridge-bot .
 
+# Create data directory
+mkdir -p data
+
 # Run container
 docker run -d \
   --name zenon-bridge-bot \
+  --restart unless-stopped \
   -e TELEGRAM_BOT_TOKEN=your_token_here \
-  -v ./data:/app/data \
-  zenon-bridge-bot
+  -v $(pwd)/data:/app/data \
+  zenon-bridge-bot:latest
+```
+
+### Docker Compose Method (Recommended)
+
+```bash
+# Create .env file with your token
+echo "TELEGRAM_BOT_TOKEN=your_token_here" > .env
+
+# Build and run with docker-compose
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the bot
+docker-compose down
+```
+
+### Troubleshooting Docker Deployment
+
+**Container exits immediately:**
+```bash
+# Check logs
+docker logs zenon-bridge-bot
+
+# Common issues:
+# - Missing TELEGRAM_BOT_TOKEN
+# - Database permission issues - ensure data directory exists
+# - Port conflicts - remove existing containers
+```
+
+**Container name conflict:**
+```bash
+# Stop and remove existing container
+docker stop zenon-bridge-bot
+docker rm zenon-bridge-bot
+
+# Or force remove
+docker rm -f zenon-bridge-bot
+```
+
+**Remote server deployment:**
+```bash
+# Use sudo if needed
+sudo docker ps -a | grep zenon
+sudo docker logs zenon-bridge-bot
 ```
 
 ## Development
