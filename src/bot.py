@@ -12,11 +12,26 @@ from src.telegram.handlers import TelegramHandlers
 from src.zenon.websocket import ZenonWebSocket
 from database import init_database
 
-# Configure logging
+# Create logs directory
+LOGS_DIR = Path('logs')
+LOGS_DIR.mkdir(exist_ok=True)
+
+# Configure logging with file handler
+log_level = getattr(logging, LOG_LEVEL.upper()) if LOG_LEVEL else logging.INFO
 logging.basicConfig(
+    level=log_level,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=getattr(logging, LOG_LEVEL)
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(LOGS_DIR / 'bot.log')
+    ]
 )
+
+# Enable debug logging for WebSocket and decoder
+if LOG_LEVEL and LOG_LEVEL.upper() == 'DEBUG':
+    logging.getLogger('src.zenon.websocket').setLevel(logging.DEBUG)
+    logging.getLogger('src.zenon.decoder').setLevel(logging.DEBUG)
+
 logger = logging.getLogger(__name__)
 
 class ZenonBridgeBot:

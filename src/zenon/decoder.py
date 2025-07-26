@@ -1,9 +1,13 @@
 import base64
 import struct
 import json
+import logging
 from datetime import datetime
 from typing import Dict, Optional
+from pathlib import Path
 from src.config import TOKEN_DECIMALS, TRANSACTION_TYPES
+
+logger = logging.getLogger(__name__)
 
 class TransactionDecoder:
     """Decode Zenon bridge transaction data."""
@@ -51,35 +55,52 @@ class TransactionDecoder:
     
     def _determine_tx_type(self, tx_data: Dict) -> str:
         """Determine transaction type based on various factors."""
+        logger.debug(f"Determining transaction type for: {tx_data.get('hash', 'unknown')}")
+        
         # Check if it's a simple transfer (no data)
         if not tx_data.get('data') or tx_data.get('data') == '':
+            logger.debug("No data field, checking if transfer")
             if tx_data.get('toAddress') != tx_data.get('address'):
+                logger.debug("Identified as TRANSFER")
                 return TRANSACTION_TYPES['TRANSFER']
         
         # Check block type
         block_type = tx_data.get('blockType')
+        logger.debug(f"Block type: {block_type}")
         if block_type == 4:  # Transfer type
+            logger.debug("Block type 4: TRANSFER")
             return TRANSACTION_TYPES['TRANSFER']
         
         # Try to decode data to determine type
         if tx_data.get('data'):
             try:
                 data_bytes = base64.b64decode(tx_data['data'])
+                logger.debug(f"Data decoded: {len(data_bytes)} bytes")
                 if len(data_bytes) >= 4:
                     method_sig = data_bytes[:4]
+                    method_sig_hex = method_sig.hex()
+                    logger.info(f"Method signature: 0x{method_sig_hex}")
+                    
                     for method, sig in self.method_signatures.items():
                         if method_sig == sig:
+                            logger.info(f"Found matching signature: {method}")
                             return TRANSACTION_TYPES.get(method, 'Unknown')
-            except:
-                pass
+                    
+                    logger.warning(f"Unknown method signature: 0x{method_sig_hex}")
+            except Exception as e:
+                logger.error(f"Error decoding data: {e}")
         
         # Check if it's from/to bridge contract
         bridge_addr = 'z1qxemdeddedxdrydgexxxxxxxxxxxxxxxmqgr0d'
         if tx_data.get('toAddress') == bridge_addr:
             # Could be wrap or update request
-            if tx_data.get('tokenStandard') in ['zts1znnxxxxxxxxxxxxx9z4ulx', 'zts1qsrxxxxxxxxxxxxxmrhjll']:
+            token_std = tx_data.get('tokenStandard')
+            logger.debug(f"Transaction to bridge with token: {token_std}")
+            if token_std in ['zts1znnxxxxxxxxxxxxx9z4ulx', 'zts1qsrxxxxxxxxxxxxxmrhjll']:
+                logger.debug("Fallback identification as WRAP_TOKEN")
                 return TRANSACTION_TYPES['WRAP_TOKEN']
         
+        logger.warning(f"Could not determine transaction type for {tx_data.get('hash', 'unknown')}")
         return 'Unknown'
     
     def _decode_data(self, data_b64: str) -> Dict:
