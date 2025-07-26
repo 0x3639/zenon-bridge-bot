@@ -10,11 +10,11 @@ class TransactionDecoder:
     
     def __init__(self):
         self.method_signatures = {
-            # These are example signatures - need to be updated based on actual bridge contract
-            'WrapToken': bytes.fromhex('61d224bc'),
-            'UnwrapToken': bytes.fromhex('b60694'),
-            'Redeem': bytes.fromhex('d4e06c79'),
-            'UpdateWrapRequest': bytes.fromhex('d4bb11c0')
+            # Method signatures from actual bridge contract
+            'WRAP_TOKEN': bytes.fromhex('e4f0c639'),  # WrapToken method
+            'UNWRAP_TOKEN': bytes.fromhex('52298858'),  # UnwrapToken method  
+            'REDEEM': bytes.fromhex('1e83409a'),  # Redeem method
+            'UPDATE_WRAP_REQUEST': bytes.fromhex('ac3910a2')  # UpdateWrapRequest method
         }
     
     def decode_transaction(self, tx_data: Dict) -> Dict:
@@ -69,7 +69,7 @@ class TransactionDecoder:
                     method_sig = data_bytes[:4]
                     for method, sig in self.method_signatures.items():
                         if method_sig == sig:
-                            return TRANSACTION_TYPES.get(method.upper(), 'Unknown')
+                            return TRANSACTION_TYPES.get(method, 'Unknown')
             except:
                 pass
         

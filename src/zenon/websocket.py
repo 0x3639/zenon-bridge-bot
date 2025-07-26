@@ -104,18 +104,26 @@ class ZenonWebSocket:
                 if result:
                     await self._process_account_block(result)
     
-    async def _process_account_block(self, block_data: dict):
+    async def _process_account_block(self, block_data):
         """Process an account block and trigger callback."""
         try:
-            # Decode transaction
-            tx_info = self.decoder.decode_transaction(block_data)
+            # Handle both single blocks and arrays
+            blocks = block_data if isinstance(block_data, list) else [block_data]
             
-            # Filter out non-bridge transactions
-            if tx_info['to_addr'] == self.bridge_address or tx_info['from_addr'] == self.bridge_address:
-                logger.info(f"New bridge transaction: {tx_info['type']} - {tx_info['hash']}")
+            for block in blocks:
+                # Process the main block (FROM bridge)
+                if block.get('address') == self.bridge_address:
+                    tx_info = self.decoder.decode_transaction(block)
+                    logger.info(f"New bridge transaction (from bridge): {tx_info['type']} - {tx_info['hash']}")
+                    await self.on_transaction(tx_info)
                 
-                # Trigger callback
-                await self.on_transaction(tx_info)
+                # Process paired account block (TO bridge) - this is where wrap requests come from
+                paired_block = block.get('pairedAccountBlock')
+                if paired_block and paired_block.get('toAddress') == self.bridge_address:
+                    tx_info = self.decoder.decode_transaction(paired_block)
+                    logger.info(f"New bridge transaction (to bridge): {tx_info['type']} - {tx_info['hash']}")
+                    await self.on_transaction(tx_info)
             
         except Exception as e:
             logger.error(f"Error processing account block: {e}")
+            logger.error(f"Block data: {block_data}")
