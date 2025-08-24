@@ -91,6 +91,13 @@ class TelegramHandlers:
         user_id = update.effective_user.id
         args = context.args
         
+        # Only allow filtering for wrap, unwrap, and redeem
+        ALLOWED_FILTERS = {
+            'WRAP_TOKEN': 'WrapToken',
+            'UNWRAP_TOKEN': 'UnwrapToken', 
+            'REDEEM': 'Redeem'
+        }
+        
         if not args:
             # Show current filters and available options
             message = (
@@ -98,10 +105,10 @@ class TelegramHandlers:
                 "Usage: `/filter [type1] [type2] ...`\n"
                 "Use `/filter all` to receive all notifications\n\n"
                 "**Available Types:**\n"
+                "• wraptoken - Token wrapping to bridge\n"
+                "• unwraptoken - Token unwrapping from bridge\n"
+                "• redeem - Token redemption\n"
             )
-            
-            for key, name in TRANSACTION_TYPES.items():
-                message += f"• {name.lower()}\n"
             
             await update.message.reply_text(message, parse_mode='Markdown')
             return
@@ -110,18 +117,17 @@ class TelegramHandlers:
             # Clear all filters
             await self.db.update_subscriber_filters(user_id, [])
             await update.message.reply_text(
-                "✅ Filters cleared. You will receive all transaction notifications.",
+                "✅ Filters cleared. You will receive all bridge notifications.",
                 parse_mode='Markdown'
             )
         else:
             # Set specific filters
             filters = []
-            valid_types = [t.lower() for t in TRANSACTION_TYPES.values()]
             
             for arg in args:
                 arg_lower = arg.lower()
-                # Find matching transaction type
-                for key, name in TRANSACTION_TYPES.items():
+                # Find matching transaction type from allowed filters only
+                for key, name in ALLOWED_FILTERS.items():
                     if name.lower() == arg_lower:
                         filters.append(name)
                         break

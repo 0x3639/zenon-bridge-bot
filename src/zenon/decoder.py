@@ -15,10 +15,10 @@ class TransactionDecoder:
     def __init__(self):
         self.method_signatures = {
             # Method signatures from actual bridge contract
-            'WRAP_TOKEN': bytes.fromhex('e4f0c639'),  # WrapToken method
+            'WRAP_TOKEN': bytes.fromhex('61d224bc'),  # WrapToken method signature
             'UNWRAP_TOKEN': bytes.fromhex('52298858'),  # UnwrapToken method  
             'REDEEM': bytes.fromhex('1e83409a'),  # Redeem method
-            'UPDATE_WRAP_REQUEST': bytes.fromhex('ac3910a2')  # UpdateWrapRequest method
+            'UPDATE_WRAP_REQUEST': bytes.fromhex('d4bb11c0')  # UpdateWrapRequest method (corrected)
         }
     
     def decode_transaction(self, tx_data: Dict) -> Dict:
@@ -54,51 +54,64 @@ class TransactionDecoder:
         return result
     
     def _determine_tx_type(self, tx_data: Dict) -> str:
-        """Determine transaction type based on various factors."""
+        """Determine transaction type based on method signature and context."""
         logger.debug(f"Determining transaction type for: {tx_data.get('hash', 'unknown')}")
         
-        # Check if it's a simple transfer (no data)
-        if not tx_data.get('data') or tx_data.get('data') == '':
-            logger.debug("No data field, checking if transfer")
-            if tx_data.get('toAddress') != tx_data.get('address'):
-                logger.debug("Identified as TRANSFER")
-                return TRANSACTION_TYPES['TRANSFER']
+        bridge_addr = 'z1qxemdeddedxdrydgexxxxxxxxxxxxxxxmqgr0d'
+        to_addr = tx_data.get('toAddress', '')
+        from_addr = tx_data.get('address', '')
         
-        # Check block type
-        block_type = tx_data.get('blockType')
-        logger.debug(f"Block type: {block_type}")
-        if block_type == 4:  # Transfer type
-            logger.debug("Block type 4: TRANSFER")
-            return TRANSACTION_TYPES['TRANSFER']
-        
-        # Try to decode data to determine type
-        if tx_data.get('data'):
+        # First, try to decode method signature from data field
+        if tx_data.get('data') and tx_data['data'] != '':
             try:
                 data_bytes = base64.b64decode(tx_data['data'])
                 logger.debug(f"Data decoded: {len(data_bytes)} bytes")
+                
                 if len(data_bytes) >= 4:
                     method_sig = data_bytes[:4]
                     method_sig_hex = method_sig.hex()
                     logger.info(f"Method signature: 0x{method_sig_hex}")
                     
+                    # Check against known bridge method signatures
                     for method, sig in self.method_signatures.items():
                         if method_sig == sig:
                             logger.info(f"Found matching signature: {method}")
                             return TRANSACTION_TYPES.get(method, 'Unknown')
                     
-                    logger.warning(f"Unknown method signature: 0x{method_sig_hex}")
+                    # If has data but no matching signature, it's not a bridge operation
+                    logger.debug(f"Unknown method signature: 0x{method_sig_hex}")
+                    return 'Unknown'
+                    
             except Exception as e:
                 logger.error(f"Error decoding data: {e}")
         
-        # Check if it's from/to bridge contract
-        bridge_addr = 'z1qxemdeddedxdrydgexxxxxxxxxxxxxxxmqgr0d'
-        if tx_data.get('toAddress') == bridge_addr:
-            # Could be wrap or update request
-            token_std = tx_data.get('tokenStandard')
-            logger.debug(f"Transaction to bridge with token: {token_std}")
+        # For transactions TO bridge without explicit method signature
+        if to_addr == bridge_addr:
+            token_std = tx_data.get('tokenStandard', '')
+            amount = tx_data.get('amount', '0')
+            
+            # If it's sending ZNN/QSR to bridge with amount > 0, likely a wrap
             if token_std in ['zts1znnxxxxxxxxxxxxx9z4ulx', 'zts1qsrxxxxxxxxxxxxxmrhjll']:
-                logger.debug("Fallback identification as WRAP_TOKEN")
-                return TRANSACTION_TYPES['WRAP_TOKEN']
+                if amount != '0' and amount != 0:
+                    logger.info("Identified as WRAP_TOKEN based on context (token to bridge)")
+                    return TRANSACTION_TYPES['WRAP_TOKEN']
+        
+        # For transactions FROM bridge
+        if from_addr == bridge_addr:
+            token_std = tx_data.get('tokenStandard', '')
+            amount = tx_data.get('amount', '0')
+            
+            # If it's sending tokens from bridge, could be unwrap or redeem
+            if token_std and amount != '0' and amount != 0:
+                # Without explicit method signature, assume unwrap for now
+                logger.info("Identified as UNWRAP_TOKEN based on context (from bridge)")
+                return TRANSACTION_TYPES['UNWRAP_TOKEN']
+        
+        # Simple transfers not involving bridge
+        if not tx_data.get('data') or tx_data.get('data') == '':
+            if to_addr != from_addr and to_addr != bridge_addr and from_addr != bridge_addr:
+                logger.debug("Identified as TRANSFER (not bridge-related)")
+                return TRANSACTION_TYPES['TRANSFER']
         
         logger.warning(f"Could not determine transaction type for {tx_data.get('hash', 'unknown')}")
         return 'Unknown'

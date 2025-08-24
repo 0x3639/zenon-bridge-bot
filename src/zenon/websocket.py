@@ -68,12 +68,12 @@ class ZenonWebSocket:
                     logger.error(f"Error handling message: {e}")
     
     async def _subscribe(self):
-        """Subscribe to account blocks for bridge address."""
+        """Subscribe to all account blocks and filter for bridge transactions."""
         subscribe_msg = {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "ledger.subscribe",
-            "params": ["accountBlocksByAddress", self.bridge_address]
+            "params": ["allAccountBlocks"]
         }
         
         await self.ws.send(json.dumps(subscribe_msg))
@@ -84,7 +84,7 @@ class ZenonWebSocket:
         
         if 'result' in data:
             self.subscription_id = data['result']
-            logger.info(f"Subscribed to bridge address with ID: {self.subscription_id}")
+            logger.info(f"Subscribed to all account blocks with ID: {self.subscription_id}")
         else:
             raise Exception(f"Failed to subscribe: {data}")
     
@@ -121,50 +121,67 @@ class ZenonWebSocket:
                 logger.warning(f"Received notification for unknown subscription: {params.get('subscription')}")
     
     async def _process_account_block(self, block_data):
-        """Process an account block and trigger callback."""
+        """Process an account block and trigger callback if it's a bridge transaction."""
         try:
+            # Define addresses to filter
+            BURN_ADDRESS = 'z1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsggv2f'
+            
             # Save block data for debugging
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
-            with open(LOGS_DIR / f'ws_block_{timestamp}.json', 'w') as f:
-                json.dump(block_data, f, indent=2)
             
             # Handle both single blocks and arrays
             blocks = block_data if isinstance(block_data, list) else [block_data]
             
             for i, block in enumerate(blocks):
-                logger.debug(f"Processing block {i+1}/{len(blocks)}: {block.get('hash', 'unknown')[:16]}...")
+                to_addr = block.get('toAddress', '')
+                from_addr = block.get('address', '')
                 
-                # Log block details
-                logger.debug(f"Block type: {block.get('blockType')}, From: {block.get('address')}, To: {block.get('toAddress')}")
+                # Skip burn address transactions
+                if to_addr == BURN_ADDRESS:
+                    logger.debug(f"Skipping burn address transaction: {block.get('hash', 'unknown')[:16]}")
+                    continue
                 
-                # Process the main block (FROM bridge)
-                if block.get('address') == self.bridge_address:
+                # Process transactions FROM bridge (unwrap/redeem)
+                if from_addr == self.bridge_address:
                     logger.info(f"Found block FROM bridge: {block.get('hash')}")
+                    
+                    # Validate it's a real transaction
                     tx_info = self.decoder.decode_transaction(block)
-                    logger.info(f"Decoded transaction (from bridge): Type={tx_info['type']}, Hash={tx_info['hash']}")
-                    
-                    # Save decoded transaction
-                    with open(LOGS_DIR / f'tx_from_bridge_{timestamp}_{i}.json', 'w') as f:
-                        json.dump(tx_info, f, indent=2)
-                    
-                    await self.on_transaction(tx_info)
+                    if self._is_valid_bridge_transaction(tx_info):
+                        logger.info(f"Valid bridge transaction (from bridge): Type={tx_info['type']}, Hash={tx_info['hash']}")
+                        
+                        # Save decoded transaction
+                        with open(LOGS_DIR / f'tx_from_bridge_{timestamp}_{i}.json', 'w') as f:
+                            json.dump(tx_info, f, indent=2)
+                        
+                        await self.on_transaction(tx_info)
                 
-                # Process paired account block (TO bridge) - this is where wrap requests come from
-                paired_block = block.get('pairedAccountBlock')
-                if paired_block:
-                    logger.debug(f"Found paired block: {paired_block.get('hash', 'unknown')[:16]}...")
-                    if paired_block.get('toAddress') == self.bridge_address:
-                        logger.info(f"Found block TO bridge: {paired_block.get('hash')}")
-                        tx_info = self.decoder.decode_transaction(paired_block)
-                        logger.info(f"Decoded transaction (to bridge): Type={tx_info['type']}, Hash={tx_info['hash']}")
+                # Process transactions TO bridge (wrap/update)
+                if to_addr == self.bridge_address:
+                    logger.info(f"Found block TO bridge: {block.get('hash')}")
+                    
+                    tx_info = self.decoder.decode_transaction(block)
+                    if self._is_valid_bridge_transaction(tx_info):
+                        logger.info(f"Valid bridge transaction (to bridge): Type={tx_info['type']}, Hash={tx_info['hash']}")
                         
                         # Save decoded transaction
                         with open(LOGS_DIR / f'tx_to_bridge_{timestamp}_{i}.json', 'w') as f:
                             json.dump(tx_info, f, indent=2)
                         
                         await self.on_transaction(tx_info)
-                else:
-                    logger.debug(f"Block has no paired account block")
+                
+                # Also check paired account block if exists
+                paired_block = block.get('pairedAccountBlock')
+                if paired_block and paired_block.get('toAddress') != BURN_ADDRESS:
+                    paired_to = paired_block.get('toAddress', '')
+                    paired_from = paired_block.get('address', '')
+                    
+                    if paired_to == self.bridge_address or paired_from == self.bridge_address:
+                        logger.debug(f"Processing paired block: {paired_block.get('hash', 'unknown')[:16]}")
+                        tx_info = self.decoder.decode_transaction(paired_block)
+                        if self._is_valid_bridge_transaction(tx_info):
+                            logger.info(f"Valid paired bridge transaction: Type={tx_info['type']}, Hash={tx_info['hash']}")
+                            await self.on_transaction(tx_info)
             
         except Exception as e:
             logger.error(f"Error processing account block: {e}", exc_info=True)
@@ -172,3 +189,38 @@ class ZenonWebSocket:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             with open(LOGS_DIR / f'ws_error_{timestamp}.json', 'w') as f:
                 json.dump({'error': str(e), 'block_data': block_data}, f, indent=2)
+    
+    def _is_valid_bridge_transaction(self, tx_info: dict) -> bool:
+        """Check if transaction is a valid bridge operation."""
+        # Valid transaction types for bridge
+        valid_types = ['WrapToken', 'UnwrapToken', 'Redeem', 'UpdateWrapRequest']
+        
+        # Check transaction type
+        if tx_info.get('type') not in valid_types:
+            logger.debug(f"Skipping transaction with type: {tx_info.get('type')}")
+            return False
+        
+        # Check token is ZNN or QSR
+        token = tx_info.get('token', '')
+        valid_tokens = ['zts1znnxxxxxxxxxxxxx9z4ulx', 'zts1qsrxxxxxxxxxxxxxmrhjll']
+        
+        # For wrap/unwrap, must have valid token and non-zero amount
+        if tx_info['type'] in ['WrapToken', 'UnwrapToken']:
+            if token not in valid_tokens:
+                logger.debug(f"Skipping {tx_info['type']} with invalid token: {token}")
+                return False
+            
+            # Must have non-zero amount for wrap/unwrap
+            amount = tx_info.get('amount', '0')
+            if amount == '0' or amount == 0:
+                logger.debug(f"Skipping {tx_info['type']} with zero amount")
+                return False
+        
+        # UpdateWrapRequest and Redeem can have zero amounts (they're contract calls)
+        # but should still be valid tokens if specified
+        if tx_info['type'] in ['UpdateWrapRequest', 'Redeem']:
+            if token and token not in valid_tokens and token != 'zts1qqqqqqqqqqqqqqqqtq587y':
+                # Allow empty token or system token for these operations
+                logger.debug(f"Allowing {tx_info['type']} with token: {token}")
+        
+        return True

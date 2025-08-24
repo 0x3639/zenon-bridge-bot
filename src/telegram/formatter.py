@@ -151,7 +151,7 @@ class MessageFormatter:
         return """
 🤖 **Zenon Bridge Alert Bot**
 
-Monitor all activity on the Zenon Bridge in real-time!
+Monitor Zenon Bridge wrapping and unwrapping activity in real-time!
 
 **Available Commands:**
 /start - Subscribe to bridge notifications
@@ -161,12 +161,10 @@ Monitor all activity on the Zenon Bridge in real-time!
 /filter - Set notification filters
 /help - Show this help message
 
-**Transaction Types:**
-🔄 WrapToken - Wrapping native tokens
-🔓 UnwrapToken - Unwrapping bridge tokens
-💰 Redeem - Redeeming tokens
-➡️ Transfer - Token transfers
-🔄 UpdateWrapRequest - Wrap request updates
+**Monitored Transaction Types:**
+🔄 WrapToken - Wrapping ZNN/QSR tokens to bridge
+🔓 UnwrapToken - Unwrapping tokens from bridge
+💰 Redeem - Redeeming bridged tokens
 
 **Links:**
 [ZenonHub Explorer](https://zenonhub.io)
