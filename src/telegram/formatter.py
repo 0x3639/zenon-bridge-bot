@@ -173,19 +173,38 @@ class MessageFormatter:
                 token_symbol = self.token_symbols.get(stat['token'], stat['token'][:8])
                 stats_by_type[tx_type]['volume'][token_symbol] = stat['volume']
         
-        # Format by type
-        for tx_type, data in stats_by_type.items():
-            emoji = self.type_emojis.get(tx_type, '❓')
-            lines.append(f"{emoji} **{tx_type}**: {data['count']} transactions")
-            
-            # Add volume info
-            for token, volume in data['volume'].items():
-                if volume:
-                    lines.append(f"  └─ {volume:,.2f} {token}")
+        # Define cleaner type labels
+        type_labels = {
+            'WrapToken': 'Wraps',
+            'UnwrapToken': 'Unwraps', 
+            'Redeem': 'Redeems',
+            'Transfer': 'Transfers'  # In case old data exists
+        }
+        
+        # Show only the transaction types we care about, in order
+        priority_types = ['WrapToken', 'UnwrapToken', 'Redeem']
+        
+        # First show priority types
+        for tx_type in priority_types:
+            if tx_type in stats_by_type:
+                data = stats_by_type[tx_type]
+                label = type_labels.get(tx_type, tx_type)
+                lines.append(f"- **{label}**: {data['count']}")
+                
+                # Add volume info if available
+                for token, volume in data['volume'].items():
+                    if volume:
+                        lines.append(f"  └─ {volume:,.0f} {token}")
+        
+        # If no priority types found, show whatever we have
+        if not any(tx_type in stats_by_type for tx_type in priority_types):
+            for tx_type, data in stats_by_type.items():
+                label = type_labels.get(tx_type, tx_type)
+                lines.append(f"- **{label}**: {data['count']}")
         
         lines.extend([
             "",
-            f"📊 **Total**: {total_count} transactions"
+            f"**Total**: {total_count} transactions"
         ])
         
         return "\n".join(lines)
