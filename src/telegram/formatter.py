@@ -11,8 +11,8 @@ class MessageFormatter:
     
     def __init__(self):
         self.type_emojis = {
-            TRANSACTION_TYPES['WRAP_TOKEN']: '🔄',
-            TRANSACTION_TYPES['UNWRAP_TOKEN']: '🔓',
+            TRANSACTION_TYPES['WRAP_TOKEN']: '🎁',
+            TRANSACTION_TYPES['UNWRAP_TOKEN']: '📦',
             TRANSACTION_TYPES['REDEEM']: '💰',
             TRANSACTION_TYPES['TRANSFER']: '➡️',
             TRANSACTION_TYPES['UPDATE_WRAP_REQUEST']: '🔄',
@@ -64,40 +64,84 @@ class MessageFormatter:
         emoji = self.type_emojis.get(tx.get('type', 'Unknown'), '❓')
         tx_type = tx.get('type', 'Unknown')
         
-        # Build message parts
-        lines = [
-            f"{emoji} **{tx_type} Transaction**",
-            ""
-        ]
+        # Get token and amount info
+        token = tx.get('token', '')
+        token_symbol = self.token_symbols.get(token, token[:8] if token else 'Unknown')
+        amount = tx.get('amount', '0')
+        formatted_amount = tx.get('formatted_amount', '')
         
-        # Add amount and token if available
-        if tx.get('formatted_amount') and tx.get('token'):
-            token_symbol = self.token_symbols.get(tx['token'], tx['token'][:8])
-            lines.append(f"💎 Amount: {tx['formatted_amount']} {token_symbol}")
+        # Create a more descriptive title based on transaction type
+        if tx_type == 'WrapToken':
+            action_text = "Bridge Wrap"
+        elif tx_type == 'UnwrapToken':
+            action_text = "Bridge Unwrap"
+        elif tx_type == 'Redeem':
+            action_text = "Bridge Redeem"
+        else:
+            action_text = tx_type
         
-        # Add addresses
-        if tx.get('from_addr'):
-            lines.append(f"📤 From: {self._format_zts_address(tx['from_addr'])}")
-        if tx.get('to_addr'):
-            lines.append(f"📥 To: {self._format_zts_address(tx['to_addr'])}")
+        # Build message with prominent amount display
+        lines = []
         
-        # Add ETH address if present
+        # Header with transaction type and amount
+        if formatted_amount and amount != '0':
+            lines.extend([
+                f"{emoji} **{action_text}**",
+                f"",
+                f"💎 **{formatted_amount} {token_symbol}**",
+                ""
+            ])
+        else:
+            lines.extend([
+                f"{emoji} **{action_text}**",
+                ""
+            ])
+        
+        # Add addresses with better formatting
+        from_addr = tx.get('from_addr', '')
+        to_addr = tx.get('to_addr', '')
+        bridge_addr = 'z1qxemdeddedxdrydgexxxxxxxxxxxxxxxmqgr0d'
+        
+        if tx_type == 'WrapToken':
+            # User wrapping tokens - sending TO bridge
+            lines.append(f"👤 User: {self._format_zts_address(from_addr)}")
+            lines.append(f"🌉 → Bridge")
+        elif tx_type == 'UnwrapToken':
+            # Bridge unwrapping tokens - sending FROM bridge to user
+            lines.append(f"🌉 Bridge →")
+            lines.append(f"👤 User: {self._format_zts_address(to_addr)}")
+        elif tx_type == 'Redeem':
+            # Redeem operation
+            if from_addr == bridge_addr:
+                lines.append(f"🌉 Bridge →")
+                lines.append(f"👤 User: {self._format_zts_address(to_addr)}")
+            else:
+                lines.append(f"👤 User: {self._format_zts_address(from_addr)}")
+                lines.append(f"🌉 → Bridge")
+        else:
+            # Default format for other types
+            if from_addr:
+                lines.append(f"📤 From: {self._format_zts_address(from_addr)}")
+            if to_addr:
+                lines.append(f"📥 To: {self._format_zts_address(to_addr)}")
+        
+        # Add ETH address if present (for cross-chain operations)
         if tx.get('eth_addr'):
-            lines.append("")
-            lines.append(f"🔗 ETH Address: `{self._short_address(tx['eth_addr'])}`")
-            lines.append(f"[View on Etherscan]({ETHERSCAN_BASE_URL}/address/{tx['eth_addr']})")
+            lines.extend([
+                "",
+                f"🔗 ETH: `{self._short_address(tx['eth_addr'])}`",
+                f"[View on Etherscan]({ETHERSCAN_BASE_URL}/address/{tx['eth_addr']})"
+            ])
         
-        # Add transaction details
+        # Add transaction hash as clickable link
         lines.extend([
             "",
-            "📊 **Transaction Details**",
-            f"Hash: `{self._short_hash(tx['hash'])}`",
-            f"[View on ZenonHub]({ZENONHUB_BASE_URL}/explorer/transaction/{tx['hash']})"
+            f"🔍 [{self._short_hash(tx['hash'])}]({ZENONHUB_BASE_URL}/explorer/transaction/{tx['hash']}/data)"
         ])
         
         # Add timestamp if available
         if tx.get('timestamp'):
-            lines.append(f"🕐 Time: {tx['timestamp'].strftime('%Y-%m-%d %H:%M:%S UTC')}")
+            lines.append(f"⏱ {tx['timestamp'].strftime('%H:%M:%S UTC')}")
         
         # Add custom message for wrap/unwrap transactions
         custom_message = self._get_custom_message(tx_type)
@@ -162,8 +206,8 @@ Monitor Zenon Bridge wrapping and unwrapping activity in real-time!
 /help - Show this help message
 
 **Monitored Transaction Types:**
-🔄 WrapToken - Wrapping ZNN/QSR tokens to bridge
-🔓 UnwrapToken - Unwrapping tokens from bridge
+🎁 WrapToken - Wrapping ZNN/QSR tokens to bridge
+📦 UnwrapToken - Unwrapping tokens from bridge
 💰 Redeem - Redeeming bridged tokens
 
 **Links:**

@@ -45,10 +45,11 @@ class TransactionDecoder:
                 print(f"Error decoding transaction data: {e}")
         
         # Format amount with decimals
-        if result['amount'] and result['token']:
+        if result['amount'] and result['amount'] != '0':
+            # Always try to format the amount, even if token is not recognized
             result['formatted_amount'] = self._format_amount(
                 result['amount'], 
-                result['token']
+                result.get('token', '')
             )
         
         return result
