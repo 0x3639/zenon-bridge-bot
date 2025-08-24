@@ -15,7 +15,7 @@ ETHERSCAN_BASE_URL = 'https://etherscan.io'
 ZENONHUB_BASE_URL = 'https://zenonhub.io'
 
 # Database Configuration
-DATABASE_PATH = os.getenv('DATABASE_PATH', './bridge_bot.db')
+DATABASE_PATH = os.getenv('DATABASE_PATH', './data/bridge_bot.db')
 
 # Logging Configuration
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
