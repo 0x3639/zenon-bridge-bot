@@ -1,8 +1,6 @@
 import aiosqlite
 import json
 import asyncio
-import os
-from datetime import datetime
 from pathlib import Path
 from src.config import DATABASE_PATH
 
