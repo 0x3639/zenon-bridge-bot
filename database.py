@@ -1,11 +1,17 @@
 import aiosqlite
 import json
 import asyncio
+import os
 from datetime import datetime
+from pathlib import Path
 from src.config import DATABASE_PATH
 
 async def init_database():
     """Initialize the SQLite database with required tables."""
+    # Ensure the directory exists
+    db_path = Path(DATABASE_PATH)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    
     async with aiosqlite.connect(DATABASE_PATH) as db:
         # Create subscribers table
         await db.execute("""
