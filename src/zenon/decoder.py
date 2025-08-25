@@ -16,7 +16,8 @@ class TransactionDecoder:
         self.method_signatures = {
             # Method signatures from actual bridge contract
             'WRAP_TOKEN': bytes.fromhex('61d224bc'),  # WrapToken method signature
-            'UNWRAP_TOKEN': bytes.fromhex('52298858'),  # UnwrapToken method  
+            # Note: We track unwrap TRANSFERS (bridge->user with amount>0), not REQUESTS (user->bridge with amount=0)
+            # 'UNWRAP_REQUEST': bytes.fromhex('b6069401'),  # UnwrapToken request (we don't track these)
             'REDEEM': bytes.fromhex('1e83409a'),  # Redeem method
             'UPDATE_WRAP_REQUEST': bytes.fromhex('d4bb11c0')  # UpdateWrapRequest method (corrected)
         }
@@ -97,16 +98,17 @@ class TransactionDecoder:
                     logger.info("Identified as WRAP_TOKEN based on context (token to bridge)")
                     return TRANSACTION_TYPES['WRAP_TOKEN']
         
-        # For transactions FROM bridge
+        # For transactions FROM bridge (these are actual unwrap token transfers, not requests)
         if from_addr == bridge_addr:
             token_std = tx_data.get('tokenStandard', '')
             amount = tx_data.get('amount', '0')
             
-            # If it's sending tokens from bridge, could be unwrap or redeem
-            if token_std and amount != '0' and amount != 0:
-                # Without explicit method signature, assume unwrap for now
-                logger.info("Identified as UNWRAP_TOKEN based on context (from bridge)")
-                return TRANSACTION_TYPES['UNWRAP_TOKEN']
+            # Check if it's sending ZNN/QSR tokens from bridge to user (unwrap execution)
+            if token_std in ['zts1znnxxxxxxxxxxxxx9z4ulx', 'zts1qsrxxxxxxxxxxxxxmrhjll']:
+                if amount != '0' and amount != 0:
+                    # This is the actual unwrap transfer (bridge sending tokens to user)
+                    logger.info(f"Identified as UNWRAP_TOKEN transfer: {amount} of {token_std}")
+                    return TRANSACTION_TYPES['UNWRAP_TOKEN']
         
         # Simple transfers not involving bridge
         if not tx_data.get('data') or tx_data.get('data') == '':

@@ -135,40 +135,49 @@ class ZenonWebSocket:
             for i, block in enumerate(blocks):
                 to_addr = block.get('toAddress', '')
                 from_addr = block.get('address', '')
+                block_hash = block.get('hash', 'unknown')
+                
+                # Log all blocks involving bridge for debugging
+                if to_addr == self.bridge_address or from_addr == self.bridge_address:
+                    logger.info(f"Bridge-related block: hash={block_hash[:16]}, from={from_addr[:20]}, to={to_addr[:20]}")
                 
                 # Skip burn address transactions
                 if to_addr == BURN_ADDRESS:
-                    logger.debug(f"Skipping burn address transaction: {block.get('hash', 'unknown')[:16]}")
+                    logger.debug(f"Skipping burn address transaction: {block_hash[:16]}")
                     continue
                 
                 # Process transactions FROM bridge (unwrap/redeem)
                 if from_addr == self.bridge_address:
-                    logger.info(f"Found block FROM bridge: {block.get('hash')}")
+                    logger.info(f"Found block FROM bridge: {block_hash}")
                     
                     # Validate it's a real transaction
                     tx_info = self.decoder.decode_transaction(block)
                     if self._is_valid_bridge_transaction(tx_info):
-                        logger.info(f"Valid bridge transaction (from bridge): Type={tx_info['type']}, Hash={tx_info['hash']}")
+                        logger.info(f"✅ Valid bridge transaction (from bridge): Type={tx_info['type']}, Hash={tx_info['hash'][:16]}, Amount={tx_info.get('amount', 0)}")
                         
                         # Save decoded transaction
                         with open(LOGS_DIR / f'tx_from_bridge_{timestamp}_{i}.json', 'w') as f:
                             json.dump(tx_info, f, indent=2)
                         
                         await self.on_transaction(tx_info)
+                    else:
+                        logger.warning(f"❌ Invalid bridge transaction from bridge: {block_hash[:16]}")
                 
                 # Process transactions TO bridge (wrap/update)
                 if to_addr == self.bridge_address:
-                    logger.info(f"Found block TO bridge: {block.get('hash')}")
+                    logger.info(f"Found block TO bridge: {block_hash}")
                     
                     tx_info = self.decoder.decode_transaction(block)
                     if self._is_valid_bridge_transaction(tx_info):
-                        logger.info(f"Valid bridge transaction (to bridge): Type={tx_info['type']}, Hash={tx_info['hash']}")
+                        logger.info(f"✅ Valid bridge transaction (to bridge): Type={tx_info['type']}, Hash={tx_info['hash'][:16]}, Amount={tx_info.get('amount', 0)}")
                         
                         # Save decoded transaction
                         with open(LOGS_DIR / f'tx_to_bridge_{timestamp}_{i}.json', 'w') as f:
                             json.dump(tx_info, f, indent=2)
                         
                         await self.on_transaction(tx_info)
+                    else:
+                        logger.warning(f"❌ Invalid bridge transaction to bridge: {block_hash[:16]}, Type={tx_info.get('type', 'unknown')}")
                 
                 # Also check paired account block if exists
                 paired_block = block.get('pairedAccountBlock')
@@ -191,8 +200,15 @@ class ZenonWebSocket:
                 json.dump({'error': str(e), 'block_data': block_data}, f, indent=2)
     
     def _is_valid_bridge_transaction(self, tx_info: dict) -> bool:
-        """Check if transaction is a valid bridge operation."""
-        # Valid transaction types for bridge
+        """Check if transaction is a valid bridge operation that should be notified.
+        
+        We track:
+        - WrapToken: User sending tokens TO bridge (amount > 0)
+        - UnwrapToken: Bridge sending tokens TO user (amount > 0) - NOT the request
+        - Redeem: Redemption operations
+        - UpdateWrapRequest: Wrap request updates
+        """
+        # Valid transaction types for notifications
         valid_types = ['WrapToken', 'UnwrapToken', 'Redeem', 'UpdateWrapRequest']
         
         # Check transaction type
@@ -204,16 +220,16 @@ class ZenonWebSocket:
         token = tx_info.get('token', '')
         valid_tokens = ['zts1znnxxxxxxxxxxxxx9z4ulx', 'zts1qsrxxxxxxxxxxxxxmrhjll']
         
-        # For wrap/unwrap, must have valid token and non-zero amount
+        # For wrap/unwrap transfers, must have valid token and non-zero amount
         if tx_info['type'] in ['WrapToken', 'UnwrapToken']:
             if token not in valid_tokens:
                 logger.debug(f"Skipping {tx_info['type']} with invalid token: {token}")
                 return False
             
-            # Must have non-zero amount for wrap/unwrap
+            # Must have non-zero amount (we only track actual token transfers, not requests)
             amount = tx_info.get('amount', '0')
             if amount == '0' or amount == 0:
-                logger.debug(f"Skipping {tx_info['type']} with zero amount")
+                logger.debug(f"Skipping {tx_info['type']} with zero amount (likely a request, not transfer)")
                 return False
         
         # UpdateWrapRequest and Redeem can have zero amounts (they're contract calls)
